@@ -2,6 +2,9 @@
 ![Upload Pipeline](文件上传.png)
 ![search Pipeline](检索阶段.png)
 
+## Application functions
+![Application Pipeline](ERD.png）
+
 ## Running the demo of vue front-end locally:
 Ensure that you installed Node.js and Vue3.
 
