@@ -5,24 +5,24 @@
 ## Application functions
 ![search Pipeline](ERD.png)
 
-## Running the demo of vue front-end locally:
+## Running the demo of the app locally:
 Ensure that you install Python 3.10. 
 Ensure that you install Pytorch.
 
-** For mac
+# For Mac 
 ```
 brew install poppler
 ```
+# For Windows
+You may directly download it from http://blog.alivate.com.au/poppler-windows/
 
-To run this app, you need to
+# Install dependencies and run the app
 ```
-cd your_app_folder/
+cd pdf_rag/
 pip install -r requirements.txt
 streamlit run pdf_rag.py
 ```
-On windows, make sure that you put streamlit on you PATH.
-
-<a href="https://ibb.co/p69RPHVT" target="_blank"></a>
+# make sure that you put streamlit on you PATH.
 
 ## Front End Layout
 ### Default
