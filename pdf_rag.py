@@ -36,7 +36,7 @@ st.markdown("""
         padding-right: {padding_right}%;
         }}
 </style>""".format(
-    padding_top=0, padding_bottom=0, padding_left=12.5, padding_right=12.5
+    padding_top=0, padding_bottom=0, padding_left=10, padding_right=10
 ),
     unsafe_allow_html=True,
 )
@@ -67,13 +67,26 @@ def click_button():
     st.session_state.button = not st.session_state.button
 
 
-def upload_pdf(file):
+def upload_single_pdf(file):
     """Save the uploaded PDF to the specified directory."""
     try:
         file_path = os.path.join(pdfs_directory, file.name)
         with open(file_path, "wb") as f:
             f.write(file.getbuffer())
         return file_path
+    except Exception as e:
+        st.error(f"Error saving file: {e}")
+        return None
+
+def upload_multiple_pdf(files):
+    """Save the uploaded PDF to the specified directory."""
+    try:
+        file_path_list = []
+        for i in range (0,len(files)):
+            file_path_list.append(os.path.join(pdfs_directory, files[i].name))
+            with open(file_path_list[i], "wb") as f:
+                f.write(files[i].getbuffer())
+        return file_path_list
     except Exception as e:
         st.error(f"Error saving file: {e}")
         return None
@@ -121,128 +134,204 @@ Answer:"""
     return llm_model.generate([prompt]).generations[0][0].text
 
 
-if 'pdf_submitted' not in st.session_state:
-    st.session_state['pdf_submitted'] = False
-if 'file_path' not in st.session_state:
-    st.session_state['file_path'] = None
+if 'pdf_submitted_query' not in st.session_state:
+    st.session_state['pdf_submitted_query'] = False
+if 'file_path_query' not in st.session_state:
+    st.session_state['file_path_query'] = None
+if 'review_button_query' not in st.session_state:
+    st.session_state['review_button_query'] = False
+
+if 'pdf_submitted_chat' not in st.session_state:
+    st.session_state['pdf_submitted_chat'] = False
+if 'file_path_chat' not in st.session_state:
+    st.session_state['file_path_chat'] = None
+if 'review_button_chat' not in st.session_state:
+    st.session_state['review_button_chat'] = None
 
 # Streamlit UI
 
 st.title("Document Research Assistance System")
-uploaded_file = st.file_uploader(
-    "Upload a PDF file to start", type="pdf", accept_multiple_files=False
-)
+mainCol1, mainCol2 = st.columns([1, 1])
+with mainCol1:
+    st.header("PDF Query")        
+    uploaded_file_query = st.file_uploader(
+        "Upload **one or multiple** PDF file to start PDF query", type="pdf", accept_multiple_files=True
+    )
+with mainCol2:
+    st.header("Chat with PDF")
+    uploaded_file_chat = st.file_uploader(
+        "Upload **a single** PDF file to start PDF chat", type="pdf", accept_multiple_files=False
+    )
 
-if uploaded_file:
-    # Save the uploaded PDF
-    file_path = upload_pdf(uploaded_file)
-    if file_path:
-        success1 = st.success(f"File uploaded successfully: {uploaded_file.name}")
-        if 'button1' not in st.session_state:
-            st.session_state.button1 = False
-        modal = Modal(key="Demo Key", title="Review the uploaded PDF", padding=30, max_width=850)
-        # After submit, empty this placeholder
-        placeholder = st.empty()
-        with placeholder:
-            btCol1, btCol2, btCol3 = st.columns([3, 3, 8])
+with mainCol1:
+    if uploaded_file_query:
+        # Save the uploaded PDF
+        # st.write(uploaded_file_query[0])
+        file_path_list = upload_multiple_pdf(uploaded_file_query)
+        # file_name_list = [file.name for file in uploaded_file_query]
+        if file_path_list:
+            for i in range (0,len(file_path_list)):
+                txt=f"File uploaded successfully: {uploaded_file_query[i].name}"
+                htmlstr1=f"""<p style='background-color:#ebf9ee; color:#3e8750; font-size:14px; border-radius:4px;
+                                                        line-height:32px; padding-left:18px; opacity:1'> {txt}
+                                                        </style><br></p>""" 
+                st.markdown(htmlstr1,unsafe_allow_html=True) 
+                # success = st.success(f"File uploaded successfully: {uploaded_file_query[i].name}")
+
+            # After submit, empty this placeholder
+            # placeholder = st.empty()
+            # with placeholder:
+            modal = Modal(key="popup_1", title="Review the uploaded PDF", max_width=850)
+            btCol1, btCol2, btCol3 = st.columns([3, 3, 2])
             with btCol1:
+                # with st.popover("Review your PDF"):
+                #     option = st.radio("Choose a PDF to review", file_name_list,index=None)
+                # st.write(str(option))
                 open_modal = st.button('Review your PDF', key="btn_review")
+                if open_modal:
+                # if option:
+                    st.session_state['review_button_query'] = True
             with btCol2:
                 submit_pdf = st.button('Submit PDF to System', key="btn_submit")
                 if submit_pdf:
-                    st.session_state['pdf_submitted'] = True
-                    st.session_state['file_path'] = file_path
-        if open_modal:
-            with modal.container():
-                pdf_viewer(input=file_path, width=750)
+                    st.session_state['pdf_submitted_query'] = True
+                    st.session_state['file_path_query'] = file_path_list
 
-if st.session_state['pdf_submitted'] and st.session_state['file_path']:
-    file_path = st.session_state['file_path']
-    st.write("📄 Starting PDF and query processing block...")
-    success1.empty()
-    placeholder.empty()
-    mainCol1, mainCol2, mainCol3 = st.columns([5, 1, 5])
-    with mainCol1:
-        st.header("PDF Query")
-    with mainCol3:
-        st.header("Chat with PDF")
-    with mainCol1:
-        with st.spinner("Processing your PDF..."):
-            st.write("🔍 Loading images from folder...")
-            # 自动将上传的 PDF 转为图像
-            image_folder = os.path.join("chat-with-pdf", "images", Path(file_path).stem)
-            os.makedirs(image_folder, exist_ok=True)
+if st.session_state['review_button_query']:
+    with modal.container():
+        # pdf_idx = file_name_list.index(option)
+        # st.write(f"{pdf_idx+1}. {uploaded_file_query[pdf_idx].name}")
+        # pdf_viewer(input = file_path_list[pdf_idx], width=750)
+        # st.session_state['review_button_query'] = None
+        for i in range(0,len(file_path_list)):
+            st.write(f"{i+1}. {uploaded_file_query[i].name}")
+            pdf_viewer(input=file_path_list[i], width=750)
+            st.session_state['review_button_query'] = False
 
-            # 如果文件夹中已有图片则跳过转换（防止重复转）
-            if len(os.listdir(image_folder)) == 0:
-                pages = convert_from_path(file_path)
-                for i, page in enumerate(pages):
-                    img_path = os.path.join(image_folder, f"page_{i + 1}.png")
-                    page.save(img_path, "PNG")
+with mainCol2:
+    if uploaded_file_chat:
+        file_path_single = upload_single_pdf(uploaded_file_chat)
+        if file_path_single:
+            txt=f"File uploaded successfully: {uploaded_file_chat.name}"
+            htmlstr1=f"""<p style='background-color:#ebf9ee; color:#3e8750; font-size:14px; border-radius:4px;
+                                                    line-height:32px; padding-left:18px; opacity:1'> {txt}
+                                                    </style><br></p>""" 
+            st.markdown(htmlstr1,unsafe_allow_html=True) 
+            modal = Modal(key="popup_2", title="Review the uploaded PDF", max_width=850)
+            btCol4, btCol5, btCol6 = st.columns([3, 3, 2])
+            with btCol4:
+                open_modal = st.button('Review your PDF', key="btn_review_1")
+                if open_modal:
+                    with st.modal("My First Modal"):
+                        st.write("This is a simple modal!")
+                        close_button = st.button("Close Modal")
+                        if close_button:
+                            st.session_state.modal_open = False
+                            #st.session_state['review_button_chat'] = True
+            with btCol5:
+                submit_pdf = st.button('Submit PDF to System', key="btn_submit_1")
+                if submit_pdf:
+                    st.session_state['pdf_submitted_chat'] = True
+                    st.session_state['file_path_chat'] = file_path_single
+if st.session_state['review_button_chat']:
+    with modal.container():
+        st.write(uploaded_file_chat.name)
+        pdf_viewer(input=file_path_single, width=750)
+        st.session_state['review_button_chat'] = False
 
-            # 加载图片为 PIL.Image
-            images = []
-            for filename in sorted(os.listdir(image_folder)):
-                if filename.endswith(".png"):
-                    img_path = os.path.join(image_folder, filename)
-                    image = Image.open(img_path).convert("RGB")
-                    images.append(image)
+        
+################### 现在传回来的file_path_list是一个file_path的数组 ################ 
+# with mainCol1:
+#     if st.session_state['pdf_submitted_query'] and st.session_state['file_path']:
+#         file_path = st.session_state['file_path']
+#         st.write("📄 Starting PDF and query processing block...")
+    
+#     with st.spinner("Processing your PDF..."):
+#         st.write("🔍 Loading images from folder...")
+#         # 自动将上传的 PDF 转为图像
+#         image_folder = os.path.join("chat-with-pdf", "images", Path(file_path).stem)
+#         os.makedirs(image_folder, exist_ok=True)
 
-            st.success("PDF processed successfully! Input your queries below.")
-        query = st.chat_input("Input a sentence you want to query:")
-        for filename in os.listdir(image_folder):
-            if filename.endswith(".png"):
-                image_path = os.path.join(image_folder, filename)
-                image = Image.open(image_path).convert("RGB")
-                images.append(image)
-        os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
-        st.write("🧠 Loading ColQwen2 model and processor...")
-        col_model = ColQwen2.from_pretrained(
-            "/root/autodl-tmp/colqwen2-base",
-            torch_dtype=torch.float16,
-            device_map="cuda:0",
-            attn_implementation="flash_attention_2" if is_flash_attn_2_available() else None,
-        ).eval()
-        processor = ColQwen2Processor.from_pretrained("/root/autodl-tmp/colqwen2-base")
-        st.write("✅ Model loaded.")
+#         # 如果文件夹中已有图片则跳过转换（防止重复转）
+#         if len(os.listdir(image_folder)) == 0:
+#             pages = convert_from_path(file_path)
+#             for i, page in enumerate(pages):
+#                 img_path = os.path.join(image_folder, f"page_{i + 1}.png")
+#                 page.save(img_path, "PNG")
 
-        if query:
-            st.write(f"💬 Query received: {query}")
-            st.write(f"**Your query:** _{query}_")
-            with st.spinner("Processing your query..."):
-                st.write("📊 Generating embeddings and similarity scoring...")
-                queries = [query]
-                image_embeddings_list = []
-                batch_size = 4
+#         # 加载图片为 PIL.Image
+#         images = []
+#         for filename in sorted(os.listdir(image_folder)):
+#             if filename.endswith(".png"):
+#                 img_path = os.path.join(image_folder, filename)
+#                 image = Image.open(img_path).convert("RGB")
+#                 images.append(image)
 
-                batch_queries = processor.process_queries([query])
-                batch_queries = {k: v.to(col_model.device) for k, v in batch_queries.items()}
+#         st.success("PDF processed successfully! Input your queries below.")
+#     query = st.chat_input("Input a sentence you want to query:")
+#     for filename in os.listdir(image_folder):
+#         if filename.endswith(".png"):
+#             image_path = os.path.join(image_folder, filename)
+#             image = Image.open(image_path).convert("RGB")
+#             images.append(image)
+#     os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+#     st.write("🧠 Loading ColQwen2 model and processor...")
+#     col_model = ColQwen2.from_pretrained(
+#         "/root/autodl-tmp/colqwen2-base",
+#         torch_dtype=torch.float16,
+#         device_map="cuda:0",
+#         attn_implementation="flash_attention_2" if is_flash_attn_2_available() else None,
+#     ).eval()
+#     processor = ColQwen2Processor.from_pretrained("/root/autodl-tmp/colqwen2-base")
+#     st.write("✅ Model loaded.")
 
-                with torch.no_grad():
-                    for i in range(0, len(images), batch_size):
-                        image_batch = images[i:i + batch_size]
-                        batch_images = processor.process_images(image_batch)
-                        batch_images = {k: v.to(col_model.device) for k, v in batch_images.items()}
-                        outputs = col_model(**batch_images)
-                        image_embeddings_list.append(outputs)
+#     if query:
+#         st.write(f"💬 Query received: {query}")
+#         st.write(f"**Your query:** _{query}_")
+#         with st.spinner("Processing your query..."):
+#             st.write("📊 Generating embeddings and similarity scoring...")
+#             queries = [query]
+#             image_embeddings_list = []
+#             batch_size = 4
 
-                    # 合并所有图像的 embedding
-                    image_embeddings = torch.cat(image_embeddings_list, dim=0)
-                    query_embeddings = col_model(**batch_queries)
-                scores = processor.score_multi_vector(query_embeddings, image_embeddings)
-                st.write("✅ Similarity scoring complete.")
-                top_idx = scores[0].argmax().item()
-                top_image = images[top_idx]
-                similarity_score = scores[0][top_idx].item()
-                st.image(top_image, caption=f"Most similar image. Similarity: {similarity_score:.2f}")
-    with mainCol3:
-        st.write("🧾 Starting document chunking and indexing...")
-        with st.spinner("Processing your PDF..."):
-            documents = load_pdf(file_path)
-            if documents:
-                chunked_documents = split_text(documents)
-                index_docs(chunked_documents)
-                st.success("PDF indexed successfully! Ask your questions below.")
+#             batch_queries = processor.process_queries([query])
+#             batch_queries = {k: v.to(col_model.device) for k, v in batch_queries.items()}
+
+#             with torch.no_grad():
+#                 for i in range(0, len(images), batch_size):
+#                     image_batch = images[i:i + batch_size]
+#                     batch_images = processor.process_images(image_batch)
+#                     batch_images = {k: v.to(col_model.device) for k, v in batch_images.items()}
+#                     outputs = col_model(**batch_images)
+#                     image_embeddings_list.append(outputs)
+
+#                 # 合并所有图像的 embedding
+#                 image_embeddings = torch.cat(image_embeddings_list, dim=0)
+#                 query_embeddings = col_model(**batch_queries)
+#             scores = processor.score_multi_vector(query_embeddings, image_embeddings)
+#             st.write("✅ Similarity scoring complete.")
+#             top_idx = scores[0].argmax().item()
+#             top_image = images[top_idx]
+#             similarity_score = scores[0][top_idx].item()
+#             st.image(top_image, caption=f"Most similar image. Similarity: {similarity_score:.2f}")
+with mainCol2:
+    # st.write("🧾 Starting document chunking and indexing...")
+    # with st.spinner("Processing your PDF..."):
+    #     documents = load_pdf(file_path)
+    #     if documents:
+    #         chunked_documents = split_text(documents)
+    #         index_docs(chunked_documents)
+    #         st.success("PDF indexed successfully! Ask your questions below.")
+    if st.session_state['pdf_submitted_chat'] and st.session_state['file_path_chat']:
+            st.write("🧾 Starting document chunking and indexing...")
+            with st.spinner("Processing your PDF..."):
+                documents = load_pdf(file_path_single)
+                if documents:
+                    chunked_documents = split_text(documents)
+                    index_docs(chunked_documents)
+                    st.success("PDF indexed successfully! Ask your questions below.")
+
+    if st.session_state['pdf_submitted_chat'] and st.session_state['file_path_chat']:
         question = st.chat_input("Ask a question about the uploaded PDF:")
         st.write("🗣 Waiting for PDF-related question input...")
         if question:
