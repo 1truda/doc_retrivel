@@ -1,3 +1,4 @@
+
 import os
 import streamlit as st
 from pathlib import Path
@@ -13,9 +14,23 @@ from openai import OpenAI
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# ---------------------- 全局配置 ----------------------
+# ---------------------- Static Settings ----------------------
 st.set_page_config(layout="wide")
 st.title("📚 Document Research Assistance System")
+
+st.markdown("""
+<style>
+    .appview-container .main .block-container {{
+        padding-top: {padding_top}rem;
+        padding-bottom: {padding_bottom}rem;
+        padding-left: {padding_left}%;
+        padding-right: {padding_right}%;
+        }}
+</style>""".format(
+    padding_top=1, padding_bottom=1, padding_left=10, padding_right=10
+),
+    unsafe_allow_html=True,
+)
 
 HF_CACHE = "/root/autodl-tmp/colqwen2-base"
 PDF_DIR = "chat-with-pdf/pdfs/"
@@ -28,7 +43,7 @@ client = OpenAI(
     base_url="https://ark.cn-beijing.volces.com/api/v3",
 )
 
-# ---------------------- Session State 初始化 ----------------------
+# ---------------------- Session State Initialization ----------------------
 for key, default in {
     'uploaded_files_query': None,  # 多文件上传组件返回值
     'file_path_query': None,  # 多文件保存路径列表
@@ -48,7 +63,7 @@ for key, default in {
     if key not in st.session_state:
         st.session_state[key] = default
 
-# ---------------------- PDF 上传函数 ----------------------
+# ---------------------- PDF Upload Controllers ----------------------
 PDF_DIR = "chat-with-pdf/pdfs/"
 os.makedirs(PDF_DIR, exist_ok=True)
 
@@ -87,13 +102,13 @@ def show_pdf_modal(files, modal_key):
             pdf_viewer(input=file, width=750)
 
 
-# ---------------------- PDF 转图像 ----------------------
+# ---------------------- PDF to Image ----------------------
 def extract_images_from_pdfs(file_paths):
     all_images = []
     for file_path in file_paths:
         folder = os.path.join(IMG_DIR, Path(file_path).stem)
         os.makedirs(folder, exist_ok=True)
-        if not os.listdir(folder):  # 避免重复转换
+        if not os.listdir(folder):  # Avoid multiple transition
             pages = convert_from_path(file_path)
             for i, page in enumerate(pages):
                 img_path = os.path.join(folder, f"page_{i + 1}.png")
@@ -103,7 +118,7 @@ def extract_images_from_pdfs(file_paths):
     return all_images
 
 
-# ---------------------- ColQwen2 模型加载 ----------------------
+# ---------------------- Loading ColQwen2 Module ----------------------
 def load_colqwen2():
     if "col_model" not in st.session_state:
         os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
@@ -116,7 +131,7 @@ def load_colqwen2():
         st.session_state.processor = ColQwen2Processor.from_pretrained(HF_CACHE)
 
 
-# ---------------------- Query 检索 ----------------------
+# ---------------------- Query Function ----------------------
 def handle_query(query):
     model = st.session_state.col_model
     processor = st.session_state.processor
@@ -142,7 +157,7 @@ def handle_query(query):
     return [(all_images[i.item()], scores[0][i].item()) for i in top_idx]
 
 
-# ---------------------- Chat LLM 处理 ----------------------
+# ---------------------- Chat LLM Processing ----------------------
 def sambanova_chat(messages):
     try:
         response = client.chat.completions.create(
@@ -155,7 +170,7 @@ def sambanova_chat(messages):
         return f"[Chat Error] {str(e)}"
 
 
-# ---------------------- Chat 与文档 ----------------------
+# ---------------------- Chat / File Loading ----------------------
 def load_pdf(path):
     return PDFPlumberLoader(path).load()
 
@@ -192,17 +207,17 @@ Question:
     ])
 
 
-# ---------------------- Layout：左右列 ----------------------
+# ---------------------- Layout：2 Columns ----------------------
 mainCol1, mainCol2 = st.columns(2)
 
 with mainCol1:
     st.header("🔍 PDF Query")
 
-    # 初始化状态
+    # Initialization
     if 'uploaded_files_query' not in st.session_state:
         st.session_state['uploaded_files_query'] = []
 
-    # Query 上传组件（多文件）
+    # Query upload multiple files
     uploaded_files_query = st.file_uploader(
         "Upload one or more PDFs", type="pdf", accept_multiple_files=True, key="uploader_query"
     )
@@ -210,18 +225,26 @@ with mainCol1:
         st.session_state.uploaded_files_query = uploaded_files_query
         st.session_state.file_path_query = upload_multiple_pdfs(uploaded_files_query)
 
+    btcol1,btcol2,_ = st.columns([2,2,1])
     if st.session_state.file_path_query:
-        if st.button("Review Uploaded PDFs", key="btn_review_query"):
-            st.session_state.review_button_query = True
+        with btcol1:
+            if st.button("Review Uploaded PDFs", key="btn_review_query"):
+                st.session_state.review_button_query = True
 
-    if st.session_state.review_button_query:
-        show_pdf_modal(st.session_state.file_path_query, "popup_query")
-        st.session_state.review_button_query = False
+    # if st.button("Submit Query PDF", key="btn_submit_query") and st.session_state.file_path_query:
+    #     st.session_state.pdf_submitted_query = True
+    #     st.rerun()
+    if st.session_state.file_path_query:
+        with btcol2:
+            if st.button("Submit Query PDF", key="btn_submit_query"):
+                st.session_state.pdf_submitted_query = True
+                st.rerun()
 
-    if st.button("Submit Query PDF", key="btn_submit_query") and st.session_state.file_path_query:
-        st.session_state.pdf_submitted_query = True
-        st.rerun()
+if st.session_state.review_button_query:
+    show_pdf_modal(st.session_state.file_path_query, "popup_query")
+    st.session_state.review_button_query = False
 
+with mainCol1:
     if st.session_state.pdf_submitted_query and not st.session_state.query_processing_done:
         st.write("📄 Processing PDF for query...")
         st.session_state.all_images = extract_images_from_pdfs(st.session_state.file_path_query)
@@ -244,7 +267,8 @@ with mainCol1:
                     for img, score in results:
                         st.image(img, caption=f"Similarity: {score:.2f}")
 
-        # 没有新 query 时，展示上一次结果（防止 Chat 模块刷新后丢失）
+        # Show the latest result when no query is input
+        # Avoid user mis-click causing query disappear
         elif st.session_state.get("query_results"):
             st.write(f"💬 You asked: _{st.session_state.query}_")
             for img, score in st.session_state.query_results:
@@ -263,18 +287,26 @@ with mainCol2:
         st.session_state.uploaded_file_chat = uploaded_file_chat
         st.session_state.file_path_chat = upload_single_pdf(uploaded_file_chat)
 
+    btcol3,btcol4,_ = st.columns([2,2,1])
     if st.session_state.file_path_chat:
-        if st.button("Review Uploaded PDF", key="btn_review_chat"):
-            st.session_state.review_button_chat = True
+        with btcol3:
+            if st.button("Review Uploaded PDF", key="btn_review_chat"):
+                st.session_state.review_button_chat = True
 
-    if st.session_state.review_button_chat:
-        show_pdf_modal([st.session_state.file_path_chat], "popup_chat")
-        st.session_state.review_button_chat = False
+    # if st.button("Submit Chat PDF", key="btn_submit_chat") and st.session_state.file_path_chat:
+    #     st.session_state.pdf_submitted_chat = True
+    #     st.rerun()
+    if st.session_state.file_path_chat:
+        with btcol4:
+            if st.button("Submit Chat PDF", key="btn_submit_chat"):
+                st.session_state.pdf_submitted_chat = True
+                st.rerun()
 
-    if st.button("Submit Chat PDF", key="btn_submit_chat") and st.session_state.file_path_chat:
-        st.session_state.pdf_submitted_chat = True
-        st.rerun()
+if st.session_state.review_button_chat:
+    show_pdf_modal([st.session_state.file_path_chat], "popup_chat")
+    st.session_state.review_button_chat = False
 
+with mainCol2:
     if st.session_state.pdf_submitted_chat and st.session_state.file_path_chat:
         st.write("🧾 Indexing PDF for chat...")
         with st.spinner("Parsing and indexing..."):
