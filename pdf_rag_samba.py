@@ -1,4 +1,3 @@
-
 import os
 import streamlit as st
 from pathlib import Path
@@ -30,7 +29,7 @@ st.markdown("""
     padding_top=1, padding_bottom=1, padding_left=10, padding_right=10
 ),
     unsafe_allow_html=True,
-)
+) # Page margin settings
 
 HF_CACHE = "/root/autodl-tmp/colqwen2-base"
 PDF_DIR = "chat-with-pdf/pdfs/"
@@ -240,7 +239,8 @@ with mainCol1:
                 st.session_state.pdf_submitted_query = True
                 st.rerun()
 
-if st.session_state.review_button_query:
+if st.session_state.review_button_query: 
+    # Indent the show modal block to display popup in the page center
     show_pdf_modal(st.session_state.file_path_query, "popup_query")
     st.session_state.review_button_query = False
 
@@ -303,6 +303,7 @@ with mainCol2:
                 st.rerun()
 
 if st.session_state.review_button_chat:
+    # Indent the show modal block to display popup in the page center
     show_pdf_modal([st.session_state.file_path_chat], "popup_chat")
     st.session_state.review_button_chat = False
 
