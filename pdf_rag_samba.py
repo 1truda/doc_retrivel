@@ -13,8 +13,47 @@ from openai import OpenAI
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from auth_config import run_authentication
+from openai import OpenAI
+
+
+import streamlit as st
+
+if "login_success" not in st.session_state:
+    st.session_state["login_success"] = False
+
+USER_DB = {
+    "alice": "123",
+    "bob": "456",
+    "jam": "789"
+}
+
+def login():
+    st.title("🔐 LoginSystem")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        if username in USER_DB and USER_DB[username] == password:
+            st.session_state["login_success"] = True
+            st.session_state["username"] = username
+            st.rerun()
+        else:
+            st.error("❌ error")
+
+# ✅ 登录判断分支
+if not st.session_state["login_success"]:
+    login()
+    st.stop()
+
+st.write(f"Welcome，{st.session_state['username']}！")
+
+if st.button("Logout"):
+    st.session_state.clear()
+    st.rerun()
+
 # ---------------------- Static Settings ----------------------
 st.set_page_config(layout="wide")
+
 st.title("📚 Document Research Assistance System")
 
 st.markdown("""
@@ -32,8 +71,13 @@ st.markdown("""
 ) # Page margin settings
 
 HF_CACHE = "/root/autodl-tmp/colqwen2-base"
-PDF_DIR = "chat-with-pdf/pdfs/"
-IMG_DIR = "chat-with-pdf/images/"
+if not st.session_state.get("login_success"):
+    login()
+    st.stop()
+
+username = st.session_state["username"]
+PDF_DIR = f"chat-with-pdf/pdfs/{username}/"
+IMG_DIR = f"chat-with-pdf/images/{username}/"
 os.makedirs(PDF_DIR, exist_ok=True)
 os.makedirs(IMG_DIR, exist_ok=True)
 
@@ -63,8 +107,7 @@ for key, default in {
         st.session_state[key] = default
 
 # ---------------------- PDF Upload Controllers ----------------------
-PDF_DIR = "chat-with-pdf/pdfs/"
-os.makedirs(PDF_DIR, exist_ok=True)
+
 
 
 def upload_single_pdf(file):
@@ -94,7 +137,7 @@ def upload_multiple_pdfs(files):
 
 # ---------------------- PDF Viewer ----------------------
 def show_pdf_modal(files, modal_key):
-    modal = Modal(key=modal_key, title="📑 Review Uploaded PDF", max_width=850)
+    modal = Modal(key=modal_key, title="📑 Preview Uploaded PDF", max_width=850)
     with modal.container():
         for file in files:
             st.write(Path(file).name)
@@ -128,7 +171,6 @@ def load_colqwen2():
             attn_implementation="flash_attention_2" if is_flash_attn_2_available() else None,
         ).eval()
         st.session_state.processor = ColQwen2Processor.from_pretrained(HF_CACHE)
-
 
 # ---------------------- Query Function ----------------------
 def handle_query(query):
@@ -179,16 +221,20 @@ def split_text(docs):
     return splitter.split_documents(docs)
 
 
-pdf_text = ""
+# pdf_text = ""
 
 
+# def index_docs(docs):
+#     global pdf_text
+#     pdf_text = "\n\n".join([d.page_content for d in docs])
+
+
+# def retrieve_docs(_): return pdf_text
 def index_docs(docs):
-    global pdf_text
-    pdf_text = "\n\n".join([d.page_content for d in docs])
+    st.session_state.pdf_text = "\n\n".join([d.page_content for d in docs])
 
-
-def retrieve_docs(_): return pdf_text
-
+def retrieve_docs(_):
+    return st.session_state.get("pdf_text", "[ERROR] No document loaded")
 
 def answer_question(q, ctx):
     prompt = f"""
@@ -227,7 +273,7 @@ with mainCol1:
     btcol1,btcol2,_ = st.columns([2,2,1])
     if st.session_state.file_path_query:
         with btcol1:
-            if st.button("Review Uploaded PDFs", key="btn_review_query"):
+            if st.button("Preview Uploaded PDFs", key="btn_review_query"):
                 st.session_state.review_button_query = True
 
     # if st.button("Submit Query PDF", key="btn_submit_query") and st.session_state.file_path_query:
@@ -239,7 +285,7 @@ with mainCol1:
                 st.session_state.pdf_submitted_query = True
                 st.rerun()
 
-if st.session_state.review_button_query: 
+if st.session_state.review_button_query:
     # Indent the show modal block to display popup in the page center
     show_pdf_modal(st.session_state.file_path_query, "popup_query")
     st.session_state.review_button_query = False
@@ -290,7 +336,7 @@ with mainCol2:
     btcol3,btcol4,_ = st.columns([2,2,1])
     if st.session_state.file_path_chat:
         with btcol3:
-            if st.button("Review Uploaded PDF", key="btn_review_chat"):
+            if st.button("Preview Uploaded PDF", key="btn_review_chat"):
                 st.session_state.review_button_chat = True
 
     # if st.button("Submit Chat PDF", key="btn_submit_chat") and st.session_state.file_path_chat:
