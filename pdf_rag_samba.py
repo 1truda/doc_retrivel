@@ -220,16 +220,6 @@ def split_text(docs):
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     return splitter.split_documents(docs)
 
-
-# pdf_text = ""
-
-
-# def index_docs(docs):
-#     global pdf_text
-#     pdf_text = "\n\n".join([d.page_content for d in docs])
-
-
-# def retrieve_docs(_): return pdf_text
 def index_docs(docs):
     st.session_state.pdf_text = "\n\n".join([d.page_content for d in docs])
 
